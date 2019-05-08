@@ -1,16 +1,19 @@
 #! /usr/bin/env python3
 # coding: utf-8
 
-import os
-import pprint
-import logging as lg
+"""
+============================================
+  Set the SetOfParliamentMember class
+============================================
+"""
+
 import datetime as dt
 
-import pandas as pd
 import matplotlib as mil
-mil.use('TkAgg')
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+mil.use('TkAgg')
 
 AGE_COLUMN_NAME = "age"
 AGE_YEARS_COLUMN_NAME = "age_in_years"
@@ -18,16 +21,34 @@ BIRTH_COLUMN_NAME = "birth"
 MINIMUM_MP_AGE = 18
 
 class SetOfParliamentMember:
+    """
+    Set a bunch of method to make charts on set of parliament members
+    """
+    ALL_REGISTERED_PARTIES = []
     def __init__(self, name):
         self.name = name
+        self.dataframe = None
 
     def data_from_csv(self, csv_file):
+        """
+        Read data from csv_file and save it into ALL_REGISTERED_PARTIES
+        """
         self.dataframe = pd.read_csv(csv_file, sep=";")
+        parties = self.dataframe["parti_ratt_financier"].dropna().values
+        self._register_parties(parties)
 
     def data_from_dataframe(self, dataframe):
+        """
+        Read data from dataframe and save it into ALL_REGISTERED_PARTIES
+        """
         self.dataframe = dataframe
+        parties = self.dataframe["parti_ratt_financier"].dropna().values
+        self._register_parties(parties)
 
     def display_chart(self):
+        """
+        Diplay a chart based on set of parliament members
+        """
         data = self.dataframe
         female_mps = data[data.sexe == "F"]
         male_mps = data[data.sexe == "H"]
@@ -38,17 +59,21 @@ class SetOfParliamentMember:
         proportions = counts / nb_mps
 
         labels = ["Female ({})".format(counts[0]), "Male ({})".format(counts[1])]
-        fig, ax = plt.subplots()
-        ax.axis("equal")
-        ax.pie(
+        fig, chart_axis = plt.subplots()
+        chart_axis.axis("equal")
+        chart_axis.pie(
             proportions,
             labels=labels,
             autopct="%1.1f pourcents"
         )
+        print(fig)
         plt.title("{} ({} MPs)".format(self.name, nb_mps))
         plt.show()
 
     def split_by_political_party(self):
+        """
+        Split data by political parties
+        """
         result = {}
         data = self.dataframe
 
@@ -64,8 +89,9 @@ class SetOfParliamentMember:
 
     def __str__(self):
         names = []
-        for row_index, mp in self.dataframe.iterrows():
-            names += [mp.nom]
+        for row_index, member in self.dataframe.iterrows():
+            print(row_index)
+            names += [member.nom]
         return str(names)
 
     def __repr__(self):
@@ -79,27 +105,26 @@ class SetOfParliamentMember:
 
     def __getitem__(self, index):
         try:
-            result = dict(self.dataframe.iloc[index])
-        except:
+            result = dict(self.dataframe.ix[index])
+        except IndexError:
             if index < 0:
                 raise Exception("Please select a positive index")
-            elif index >= len(self.dataframe):
+            if index >= len(self.dataframe):
                 raise Exception("There are only {} MPs !".format(len(self.dataframe)))
-            else:
-                raise Exception("Wrong index")
         return result
 
     def __add__(self, other):
         if not isinstance(other, SetOfParliamentMember):
-            raise Exception("Can not add a SetOfParliamentMember with an object of type {}".format(type(other)))
+            raise Exception("""Can not add a SetOfParliamentMember
+                            with an object of type {}""".format(type(other)))
 
         df1, df2 = self.dataframe, other.dataframe
-        df = df1.append(df2)
-        df = df.drop_duplicates()
+        dataframe = df1.append(df2)
+        dataframe = dataframe.drop_duplicates()
 
-        s = SetOfParliamentMember("{} - {}".format(self.name, other.name))
-        s.data_from_dataframe(df)
-        return s
+        df_set = SetOfParliamentMember("{} - {}".format(self.name, other.name))
+        df_set.data_from_dataframe(dataframe)
+        return df_set
 
     def __radd__(self, other):
         return self
@@ -112,25 +137,44 @@ class SetOfParliamentMember:
 
     @property
     def number_of_mps(self):
+        """
+        Returns the length of the dataframe
+        """
         return len(self.dataframe)
 
     @number_of_mps.setter
     def number_of_mps(self, value):
-        raise Exception("You can not set the number of MPs!")
+        """
+        Raise an error if trying to set the number of mps
+        """
+        raise Exception("You can not set the number of MPs!", self)
 
     @classmethod
-    def _register_parties(cl, parties):
-        cl.ALL_REGISTERED_PARTIES = cl._group_two_lists_of_parties(cl.ALL_REGISTERED_PARTIES, list(parties))
+    def _register_parties(cls, parties):
+        """
+        Register the parties in dataframe
+        """
+        cls.ALL_REGISTERED_PARTIES = cls._group_two_lists_of_parties(cls.ALL_REGISTERED_PARTIES,
+                                                                     list(parties))
 
     @classmethod
-    def get_all_registered_parties(cl):
-        return cl.ALL_REGISTERED_PARTIES
+    def get_all_registered_parties(cls):
+        """
+        Get all the parties in dataframe
+        """
+        return cls.ALL_REGISTERED_PARTIES
 
     @staticmethod
     def _group_two_lists_of_parties(original, new):
+        """
+        Group two list of parties
+        """
         return list(set(original + new))
 
     def number_mp_by_party(self):
+        """
+        Returns the number of members for each parties
+        """
         data = self.dataframe
         result = {}
 
@@ -142,18 +186,26 @@ class SetOfParliamentMember:
 
     @staticmethod
     def display_histogram(values):
-        fig, ax = plt.subplots()
-        ax.hist(values, bins = 20)
+        """
+        Displays an histogram of ages in a party
+        """
+        fig, chart_axis = plt.subplots()
+        print(fig)
+        chart_axis.hist(values, bins=20)
         plt.title("Ages ({} MPs)".format(len(values)))
         plt.show()
 
     def _compute_age_column(self):
+        """
+        Set the age column into datetime format
+        """
         now = dt.datetime.now()
         data = self.dataframe
 
         if not BIRTH_COLUMN_NAME in data.columns:
             data[BIRTH_COLUMN_NAME] = \
-                data["date_naissance"].apply(lambda string: dt.datetime.strptime(string, "%Y-%m-%d"))
+                data["date_naissance"].apply(lambda string:
+                                             dt.datetime.strptime(string, "%Y-%m-%d"))
 
         if not AGE_COLUMN_NAME in data.columns:
             data[AGE_COLUMN_NAME] = data[BIRTH_COLUMN_NAME].apply(lambda date: now-date)
@@ -169,6 +221,9 @@ class SetOfParliamentMember:
         data[AGE_YEARS_COLUMN_NAME] = new_column
 
     def split_by_age(self, age_split):
+        """
+        Split parties members by age
+        """
         data = self.dataframe
         self._compute_age_column()
         self.display_histogram(data[AGE_YEARS_COLUMN_NAME].values)
@@ -177,21 +232,21 @@ class SetOfParliamentMember:
 
         if age_split < MINIMUM_MP_AGE:
             categ = "Under (or equal) {} years old".format(MINIMUM_MP_AGE)
-            s = SetOfParliamentMember(categ)
-            s.data_from_dataframe(data)
-            result = {categ: s}
+            data_set = SetOfParliamentMember(categ)
+            data_set.data_from_dataframe(data)
+            result = {categ: data_set}
         else:
             categ1 = "Under (or equal) {} years old".format(age_split)
             categ2 = "Over {} years old".format(age_split)
-            s1, s2 = SetOfParliamentMember(categ1), SetOfParliamentMember(categ2)
+            set1, set2 = SetOfParliamentMember(categ1), SetOfParliamentMember(categ2)
             condition = data[AGE_YEARS_COLUMN_NAME] <= age_split
             data1 = data[condition]
             data2 = data[~condition]
-            s1.data_from_dataframe(data1)
-            s2.data_from_dataframe(data2)
+            set1.data_from_dataframe(data1)
+            set2.data_from_dataframe(data2)
             result = {
-                categ1: s1,
-                categ2: s2
+                categ1: set1,
+                categ2: set2
             }
 
         return result
