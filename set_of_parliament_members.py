@@ -4,12 +4,18 @@
 import os
 import pprint
 import logging as lg
+import datetime as dt
 
 import pandas as pd
 import matplotlib as mil
 mil.use('TkAgg')
 import matplotlib.pyplot as plt
 import numpy as np
+
+AGE_COLUMN_NAME = "age"
+AGE_YEARS_COLUMN_NAME = "age_in_years"
+BIRTH_COLUMN_NAME = "birth"
+MINIMUM_MP_AGE = 18
 
 class SetOfParliamentMember:
     def __init__(self, name):
@@ -124,45 +130,68 @@ class SetOfParliamentMember:
     def _group_two_lists_of_parties(original, new):
         return list(set(original + new))
 
-    
-def launch_analysis(data_file, by_party = False, info = False, displaynames = False, searchname = None, index = None, groupfirst = None):
-    sopm = SetOfParliamentMember("All MPs")
-    sopm.data_from_csv(os.path.join("data", data_file))
-    sopm.display_chart()
+    def number_mp_by_party(self):
+        data = self.dataframe
+        result = {}
 
-    if by_party:
-        for party, s in sopm.split_by_political_party().items():
-            s.display_chart()
+        for party in self.get_all_registered_parties():
+            mps_of_this_party = data[data["parti_ratt_financier"] == party]
+            result[party] = len(mps_of_this_party)
 
-    if info:
-        print()
-        print(repr(sopm))
+        return result
 
-    if displaynames:
-        print()
-        print(sopm)
+    @staticmethod
+    def display_histogram(values):
+        fig, ax = plt.subplots()
+        ax.hist(values, bins = 20)
+        plt.title("Ages ({} MPs)".format(len(values)))
+        plt.show()
 
-    if searchname is not None:
-        is_present = searchname in sopm
-        print()
-        print("Testing if {} is present: {}".format(searchname, is_present))
+    def _compute_age_column(self):
+        now = dt.datetime.now()
+        data = self.dataframe
 
-    if index is not None:
-        index = int(index)
-        print()
-        pprint.pprint(sopm[index])
+        if not BIRTH_COLUMN_NAME in data.columns:
+            data[BIRTH_COLUMN_NAME] = \
+                data["date_naissance"].apply(lambda string: dt.datetime.strptime(string, "%Y-%m-%d"))
 
-    if groupfirst is not None:
-        groupfirst = int(groupfirst)
-        parties = sopm.split_by_political_party()
-        parties = parties.values()
-        parties_by_size = sorted(parties, reverse = True)
+        if not AGE_COLUMN_NAME in data.columns:
+            data[AGE_COLUMN_NAME] = data[BIRTH_COLUMN_NAME].apply(lambda date: now-date)
 
-        print()
-        print("Info: the {} biggest groups are :".format(groupfirst))
-        for p in parties_by_size[0:groupfirst]:
-            print(p.name)
+        new_column = []
+        for age in data[AGE_COLUMN_NAME]:
+            # age is of type datetime.timedelta (because it was
+            # calculated from a difference between two dates)
+            # Here, we want to convert it to an integer containing
+            # the the age, expressed in years.
+            age_in_years = int(age.days / 365)
+            new_column += [age_in_years]
+        data[AGE_YEARS_COLUMN_NAME] = new_column
 
-        s = sum(parties_by_size[0:groupfirst])
+    def split_by_age(self, age_split):
+        data = self.dataframe
+        self._compute_age_column()
+        self.display_histogram(data[AGE_YEARS_COLUMN_NAME].values)
 
-        s.display_chart()
+        result = {}
+
+        if age_split < MINIMUM_MP_AGE:
+            categ = "Under (or equal) {} years old".format(MINIMUM_MP_AGE)
+            s = SetOfParliamentMember(categ)
+            s.data_from_dataframe(data)
+            result = {categ: s}
+        else:
+            categ1 = "Under (or equal) {} years old".format(age_split)
+            categ2 = "Over {} years old".format(age_split)
+            s1, s2 = SetOfParliamentMember(categ1), SetOfParliamentMember(categ2)
+            condition = data[AGE_YEARS_COLUMN_NAME] <= age_split
+            data1 = data[condition]
+            data2 = data[~condition]
+            s1.data_from_dataframe(data1)
+            s2.data_from_dataframe(data2)
+            result = {
+                categ1: s1,
+                categ2: s2
+            }
+
+        return result
