@@ -104,14 +104,25 @@ class SetOfParliamentMember:
     def __gt__(self, other):
         return self.number_of_mps > other.number_of_mps
 
-    def __getattr__(self, attr):
-        if attr == "number_of_mps":
-            return len(self.dataframe)
+    @property
+    def number_of_mps(self):
+        return len(self.dataframe)
 
-    def __setattr__(self, attr, value):
-        if attr == "number_of_mps":
-            raise Exception("You can not set the number of MPs !")
-        self.__dict__[attr] = value
+    @number_of_mps.setter
+    def number_of_mps(self, value):
+        raise Exception("You can not set the number of MPs!")
+
+    @classmethod
+    def _register_parties(cl, parties):
+        cl.ALL_REGISTERED_PARTIES = cl._group_two_lists_of_parties(cl.ALL_REGISTERED_PARTIES, list(parties))
+
+    @classmethod
+    def get_all_registered_parties(cl):
+        return cl.ALL_REGISTERED_PARTIES
+
+    @staticmethod
+    def _group_two_lists_of_parties(original, new):
+        return list(set(original + new))
 
     
 def launch_analysis(data_file, by_party = False, info = False, displaynames = False, searchname = None, index = None, groupfirst = None):
